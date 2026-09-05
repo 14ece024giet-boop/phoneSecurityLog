@@ -1,0 +1,293 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Phone Security Activity Monitor</title>
+    <!-- Bootstrap 5 CSS -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css">
+    <!-- Leaflet CSS for Map -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <style>
+        body { background: #0f172a; color: #e2e8f0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
+        .card { background: #1e293b; border: 1px solid #334155; border-radius: 12px; }
+        .table-dark { background: #1e293b; }
+        .table-dark th { background: #0f172a; border-color: #334155; }
+        .table-dark td { border-color: #334155; }
+        #map { height: 350px; width: 100%; border-radius: 10px; }
+        .badge-screen { background-color: #ef4444; }
+        .badge-app { background-color: #8b5cf6; }
+        .badge-location { background-color: #3b82f6; }
+        .badge-battery { background-color: #10b981; }
+        .badge-default { background-color: #64748b; }
+        .stat-value { font-size: 1.8rem; font-weight: 700; }
+    </style>
+</head>
+<body class="p-3 p-md-4">
+    <div class="container-fluid">
+        <!-- Header -->
+        <div class="d-flex justify-content-between align-items-center mb-4 pb-2 border-bottom border-secondary">
+            <div>
+                <h3 class="mb-0 fw-bold">🛡️ Personal Phone Security Monitor</h3>
+                <small class="text-secondary">Real-time device activity, unlock events, and telemetry stream</small>
+            </div>
+            <div>
+                <button class="btn btn-outline-info btn-sm me-2" onclick="location.reload()">🔄 Refresh</button>
+                <a href="/docs" target="_blank" class="btn btn-primary btn-sm">API Docs</a>
+            </div>
+        </div>
+
+        <!-- Metric Cards -->
+        <div class="row g-3 mb-4">
+            <div class="col-md-3">
+                <div class="card p-3 shadow-sm h-100">
+                    <div class="text-secondary small">Connected Devices</div>
+                    <div class="stat-value text-info">{{ devices|length }}</div>
+                    <div class="small text-muted">
+                        {% for d in devices %}
+                        <div>📱 {{ d.device_name }}</div>
+                        {% else %}
+                        <div>No devices enrolled yet</div>
+                        {% endfor %}
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="card p-3 shadow-sm h-100">
+                    <div class="text-secondary small">Recorded Activities</div>
+                    <div class="stat-value text-success">{{ total_events }}</div>
+                    <div class="small text-muted">Telemetry events stored</div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="card p-3 shadow-sm h-100">
+                    <div class="text-secondary small">Backed Up Contacts</div>
+                    <div class="stat-value text-primary">{{ total_contacts }}</div>
+                    <div class="small text-muted">Saved safely in cloud</div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="card p-3 shadow-sm h-100">
+                    <div class="text-secondary small">Latest Event Status</div>
+                    {% if events %}
+                    <div class="stat-value text-warning">{{ events[0].event_type }}</div>
+                    <div class="small text-muted">At {{ events[0].timestamp.strftime('%H:%M:%S') }}</div>
+                    {% else %}
+                    <div class="stat-value text-secondary">Awaiting</div>
+                    <div class="small text-muted">Waiting for phone logs</div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+
+        <!-- 📦 Complete Data Recovery & Full Export Center -->
+        <div class="card p-3 mb-4 shadow-sm border border-primary border-opacity-50" style="background: #1e293b linear-gradient(135deg, rgba(56, 189, 248, 0.05) 0%, rgba(30, 41, 59, 0.9) 100%);">
+            <div class="d-flex flex-wrap justify-content-between align-items-center mb-3 gap-2">
+                <div>
+                    <h5 class="fw-bold mb-0 text-white">📦 Data Recovery & Full Backup Center</h5>
+                    <small class="text-secondary">Export, clone, or recover all your phone data, contacts, and security logs anytime</small>
+                </div>
+                <a href="/api/v1/export/full-backup.zip" class="btn btn-primary btn-sm fw-bold px-3 shadow-sm">
+                    📦 Download Complete Backup (.ZIP)
+                </a>
+            </div>
+
+            <div class="row g-2">
+                <div class="col-md-3">
+                    <a href="/api/v1/export/contacts/vcf" class="btn btn-outline-info w-100 text-start btn-sm py-2">
+                        <div class="fw-bold">📇 Phonebook (.VCF)</div>
+                        <small class="text-secondary">1-Tap restore to any Android / iPhone</small>
+                    </a>
+                </div>
+                <div class="col-md-3">
+                    <a href="/api/v1/backup/contacts/csv" class="btn btn-outline-success w-100 text-start btn-sm py-2">
+                        <div class="fw-bold">📊 Contacts Spreadsheet (.CSV)</div>
+                        <small class="text-secondary">Excel compatible contact list</small>
+                    </a>
+                </div>
+                <div class="col-md-3">
+                    <a href="/api/v1/export/events/csv" class="btn btn-outline-warning w-100 text-start btn-sm py-2">
+                        <div class="fw-bold">📜 Activity & GPS Logs (.CSV)</div>
+                        <small class="text-secondary">Full telemetry and event history</small>
+                    </a>
+                </div>
+                <div class="col-md-3">
+                    <a href="/api/v1/export/full-backup.zip" class="btn btn-outline-light w-100 text-start btn-sm py-2">
+                        <div class="fw-bold">💾 Clone Raw Database</div>
+                        <small class="text-secondary">Includes SQLite DB + JSON snapshot</small>
+                    </a>
+                </div>
+            </div>
+
+            <!-- Recovery Guide Box -->
+            <div class="mt-3 p-2 rounded bg-dark border border-secondary border-opacity-25 small text-secondary">
+                <span class="text-info fw-bold">🚨 Lost or Replaced Your Phone?</span>
+                Download <b>Phonebook (.VCF)</b> and open the file on your new phone. All your backed-up contacts will be imported into your phonebook immediately without needing any third-party app.
+            </div>
+        </div>
+
+
+
+        <!-- Interactive Map Section -->
+        <div class="card p-3 mb-4 shadow-sm">
+            <h5 class="fw-bold mb-3">📍 Location History & Geotags</h5>
+            <div id="map"></div>
+        </div>
+
+        <!-- Activity Timeline Table -->
+        <div class="card p-3 shadow-sm">
+            <div class="d-flex justify-content-between align-items-center mb-3">
+                <h5 class="fw-bold mb-0">📜 Activity Log Stream</h5>
+                <span class="badge bg-secondary">Showing latest {{ events|length }} events</span>
+            </div>
+            <div class="table-responsive">
+                <table class="table table-dark table-hover align-middle mb-0">
+                    <thead>
+                        <tr>
+                            <th>Timestamp</th>
+                            <th>Device</th>
+                            <th>Event Type</th>
+                            <th>Battery</th>
+                            <th>GPS Coordinates</th>
+                            <th>Event Payload / Details</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for event in events %}
+                        <tr>
+                            <td><code>{{ event.timestamp.strftime('%Y-%m-%d %H:%M:%S') }}</code></td>
+                            <td><span class="badge bg-dark border border-secondary">{{ event.device_id }}</span></td>
+                            <td>
+                                {% if "SCREEN" in event.event_type or "UNLOCK" in event.event_type %}
+                                <span class="badge badge-screen">{{ event.event_type }}</span>
+                                {% elif "APP" in event.event_type %}
+                                <span class="badge badge-app">{{ event.event_type }}</span>
+                                {% elif "LOCATION" in event.event_type %}
+                                <span class="badge badge-location">{{ event.event_type }}</span>
+                                {% elif "BATTERY" in event.event_type or "CHARGING" in event.event_type %}
+                                <span class="badge badge-battery">{{ event.event_type }}</span>
+                                {% else %}
+                                <span class="badge badge-default">{{ event.event_type }}</span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                {% if event.battery_level is not none %}
+                                <span class="fw-bold {% if event.battery_level < 20 %}text-danger{% elif event.battery_level < 50 %}text-warning{% else %}text-success{% endif %}">
+                                    {{ event.battery_level }}%
+                                </span>
+                                {% else %}
+                                <span class="text-secondary">-</span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                {% if event.latitude and event.longitude %}
+                                <a href="https://maps.google.com/?q={{ event.latitude }},{{ event.longitude }}" target="_blank" class="text-info text-decoration-none">
+                                    🌐 {{ "%.4f"|format(event.latitude) }}, {{ "%.4f"|format(event.longitude) }}
+                                </a>
+                                {% else %}
+                                <span class="text-secondary">-</span>
+                                {% endif %}
+                            </td>
+                            <td><small class="text-secondary font-monospace">{{ event.details_json }}</small></td>
+                        </tr>
+                        {% else %}
+                        <tr>
+                            <td colspan="6" class="text-center py-4 text-secondary">
+                                No activity recorded yet. Run <code>python server/simulate_device.py</code> or connect the Android app.
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- Backed Up Contacts Section -->
+        <div class="card p-3 mt-4 shadow-sm">
+            <div class="d-flex flex-wrap justify-content-between align-items-center mb-3 gap-2">
+                <div>
+                    <h5 class="fw-bold mb-0">📒 Backed Up Contacts</h5>
+                    <small class="text-secondary">Contacts automatically synced from your connected phone</small>
+                </div>
+                <div class="d-flex gap-2">
+                    <input type="text" id="contactSearch" class="form-control form-control-sm bg-dark text-white border-secondary" placeholder="🔍 Search contacts by name or number..." onkeyup="filterContacts()" style="max-width: 280px;">
+                    <a href="/api/v1/backup/contacts/csv" class="btn btn-outline-success btn-sm text-nowrap">📥 Export CSV</a>
+                </div>
+            </div>
+            <div class="table-responsive" style="max-height: 400px; overflow-y: auto;">
+                <table class="table table-dark table-hover align-middle mb-0" id="contactsTable">
+                    <thead>
+                        <tr>
+                            <th>#</th>
+                            <th>Contact Name</th>
+                            <th>Phone Number</th>
+                            <th>Email</th>
+                            <th>Device Source</th>
+                            <th>Last Backup Time</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for c in contacts %}
+                        <tr class="contact-row">
+                            <td class="text-secondary">{{ loop.index }}</td>
+                            <td class="fw-bold text-white contact-name">{{ c.name }}</td>
+                            <td class="contact-phone"><code class="text-info">{{ c.phone_number }}</code></td>
+                            <td class="text-secondary">{{ c.email or "-" }}</td>
+                            <td><span class="badge bg-dark border border-secondary">{{ c.device_id }}</span></td>
+                            <td><small class="text-secondary">{{ c.synced_at.strftime('%Y-%m-%d %H:%M:%S') }}</small></td>
+                        </tr>
+                        {% else %}
+                        <tr id="noContactsRow">
+                            <td colspan="6" class="text-center py-4 text-secondary">
+                                No contacts backed up yet. Tap <b>"Backup Contacts"</b> in the mobile app to sync.
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <!-- Leaflet JS for Map -->
+    <!-- Leaflet JS for Map & Filter Script -->
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script>
+        const locations = {{ locations_json|safe }};
+        const map = L.map('map').setView([20.5937, 78.9629], 4);
+
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            attribution: '&copy; OpenStreetMap contributors'
+        }).addTo(map);
+
+        if (locations.length > 0) {
+            const markers = [];
+            locations.forEach(loc => {
+                const marker = L.marker([loc.lat, loc.lng])
+                    .bindPopup(`<b>${loc.device_id}</b><br>${loc.event_type}<br>${loc.time}`)
+                    .addTo(map);
+                markers.push(marker);
+            });
+            const group = new L.featureGroup(markers);
+            map.fitBounds(group.getBounds().pad(0.2));
+        }
+
+        // Live Contact Search Filter
+        function filterContacts() {
+            const query = document.getElementById('contactSearch').value.toLowerCase();
+            const rows = document.querySelectorAll('.contact-row');
+            rows.forEach(row => {
+                const name = row.querySelector('.contact-name')?.innerText.toLowerCase() || '';
+                const phone = row.querySelector('.contact-phone')?.innerText.toLowerCase() || '';
+                if (name.includes(query) || phone.includes(query)) {
+                    row.style.display = '';
+                } else {
+                    row.style.display = 'none';
+                }
+            });
+        }
+    </script>
+</body>
+</html>
+
+
