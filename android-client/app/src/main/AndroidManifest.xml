@@ -31,8 +31,6 @@
             android:name=".service.TrackingForegroundService"
             android:enabled="true"
             android:exported="false"
-            android:foregroundServiceType="location" />
-            android:foregroundServiceType="dataSync" />
             android:foregroundServiceType="location|dataSync" />
 
 
