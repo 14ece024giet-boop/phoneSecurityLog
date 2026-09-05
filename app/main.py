@@ -12,7 +12,8 @@ from fastapi.templating import Jinja2Templates
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 from sqlmodel import SQLModel, Session, create_engine, select
-from .models import Device, ActivityEvent, ContactBackup, CallLogBackup, SmsBackup
+from sqlmodel import SQLModel, Session, create_engine, select
+from .models import Device, ActivityEvent, ContactBackup, CallLogBackup, SmsBackup, DeviceCommand
 
 BASE_DIR = Path(__file__).resolve().parent
 DATABASE_URL = f"sqlite:///{BASE_DIR.parent}/phone_security.db"
@@ -73,10 +74,21 @@ class BatchSmsRequest(BaseModel):
     device_id: str
     sms_messages: List[SmsItem]
 
+class SendCommandRequest(BaseModel):
+    device_id: str
+    command_type: str
+
 def get_session():
     with Session(engine) as session:
         yield session
 
+# --- REMOTE COMMAND QUEUE API ---
+@app.post("/api/v1/commands/send")
+def send_command(payload: SendCommandRequest, session: Session = Depends(get_session)):
+    cmd = DeviceCommand(device_id=payload.device_id, command_type=payload.command_type, status="PENDING")
+    session.add(cmd)
+    session.commit()
+    return {"status": "queued", "command": payload.command_type, "device_id": payload.device_id}
 
 # --- INGESTION API ---
 @app.post("/api/v1/telemetry/batch")
@@ -116,8 +128,18 @@ def ingest_events(
         )
         session.add(event)
 
+    # Check for pending remote commands for this device
+    pending_commands = session.exec(
+        select(DeviceCommand).where(DeviceCommand.device_id == payload.device_id, DeviceCommand.status == "PENDING")
+    ).all()
+    cmd_list = [c.command_type for c in pending_commands]
+    for c in pending_commands:
+        c.status = "SENT"
+        session.add(c)
+
     session.commit()
-    return {"status": "success", "ingested": len(payload.events)}
+    return {"status": "success", "ingested": len(payload.events), "commands": cmd_list}
+
 
 # --- CONTACTS BACKUP API ---
 @app.post("/api/v1/backup/contacts")

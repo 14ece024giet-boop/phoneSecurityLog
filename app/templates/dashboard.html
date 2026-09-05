@@ -89,10 +89,16 @@
                     <h5 class="fw-bold mb-0 text-white">📦 Data Recovery & Full Backup Center</h5>
                     <small class="text-secondary">Export, clone, or recover all your phone data, contacts, call logs, SMS, and security logs anytime</small>
                 </div>
-                <a href="/api/v1/export/full-backup.zip" class="btn btn-primary btn-sm fw-bold px-3 shadow-sm">
-                    📦 Download Complete Backup (.ZIP)
-                </a>
+                <div class="d-flex gap-2">
+                    <button onclick="triggerRemoteBackup()" class="btn btn-warning btn-sm fw-bold px-3 shadow-sm">
+                        ⚡ Trigger Phone Backup Now
+                    </button>
+                    <a href="/api/v1/export/full-backup.zip" class="btn btn-primary btn-sm fw-bold px-3 shadow-sm">
+                        📦 Download Complete Backup (.ZIP)
+                    </a>
+                </div>
             </div>
+
 
             <div class="row g-2">
                 <div class="col-md-2">
@@ -416,6 +422,24 @@
                 r.style.display = (addr.includes(q) || body.includes(q)) ? '' : 'none';
             });
         }
+
+        // Remote Backup Trigger from Dashboard
+        function triggerRemoteBackup() {
+            const deviceId = "{{ devices[0].device_id if devices else 'all' }}";
+            fetch('/api/v1/commands/send', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({device_id: deviceId, command_type: 'FORCE_BACKUP'})
+            })
+            .then(res => res.json())
+            .then(data => {
+                alert('⚡ Remote Backup Command Sent! Your phone will immediately backup Contacts, Call Logs, and SMS on its next sync.');
+            })
+            .catch(err => {
+                alert('Error queuing remote command: ' + err);
+            });
+        }
     </script>
 </body>
 </html>
+

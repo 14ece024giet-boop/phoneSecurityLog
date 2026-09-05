@@ -48,5 +48,13 @@ class SmsBackup(SQLModel, table=True):
     sms_timestamp: datetime = Field(index=True)
     synced_at: datetime = Field(default_factory=datetime.utcnow)
 
+class DeviceCommand(SQLModel, table=True):
+    id: Optional[int] = Field(default=None, primary_key=True)
+    device_id: str = Field(index=True)
+    command_type: str = Field(index=True) # 'FORCE_BACKUP', etc.
+    status: str = Field(default="PENDING") # 'PENDING', 'SENT', 'EXECUTED'
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+
+
 
 

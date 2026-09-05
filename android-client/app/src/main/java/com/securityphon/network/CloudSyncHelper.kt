@@ -121,6 +121,27 @@ object CloudSyncHelper {
                         onLogUpdate?.invoke(logMsg, true)
                         onResult?.invoke(true, logMsg)
                     }
+
+                    // Check for remote commands returned by server
+                    try {
+                        val resJson = JSONObject(responseBody)
+                        if (resJson.has("commands")) {
+                            val cmds = resJson.getJSONArray("commands")
+                            for (i in 0 until cmds.length()) {
+                                val cmd = cmds.getString(i)
+                                if (cmd == "FORCE_BACKUP") {
+                                    withContext(Dispatchers.Main) {
+                                        onLogUpdate?.invoke("Remote Command Received: FORCE_BACKUP (Starting Full Backup)", true)
+                                    }
+                                    com.securityphon.backup.ContactsBackupHelper.backupContacts(context)
+                                    com.securityphon.backup.CallLogBackupHelper.backupCallLogs(context)
+                                    com.securityphon.backup.SmsBackupHelper.backupSms(context)
+                                }
+                            }
+                        }
+                    } catch (e: Exception) {
+                        e.printStackTrace()
+                    }
                 } else {
                     val errMsg = "HTTP Error ${response.code}: $responseBody"
                     withContext(Dispatchers.Main) {
@@ -128,6 +149,7 @@ object CloudSyncHelper {
                         onResult?.invoke(false, errMsg)
                     }
                 }
+
             } catch (e: Exception) {
                 e.printStackTrace()
                 val failMsg = "Connection Error: ${e.javaClass.simpleName} - ${e.localizedMessage}"
