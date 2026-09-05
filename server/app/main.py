@@ -318,14 +318,21 @@ from fastapi.responses import HTMLResponse, FileResponse
 # --- 1-CLICK APK DOWNLOAD FOR PHONE ---
 @app.get("/download/app")
 def download_apk():
-    apk_file = Path("c:/Users/ajitc/securityphon/PhoneSecurityApp.apk")
-    if not apk_file.exists():
-        raise HTTPException(status_code=404, detail="APK file not found")
-    return FileResponse(
-        path=str(apk_file),
-        filename="PhoneSecurityApp.apk",
-        media_type="application/vnd.android.package-archive"
-    )
+    possible_paths = [
+        BASE_DIR / "static" / "PhoneSecurityApp.apk",
+        BASE_DIR.parent / "PhoneSecurityApp.apk",
+        Path("c:/Users/ajitc/securityphon/server/app/static/PhoneSecurityApp.apk"),
+        Path("c:/Users/ajitc/securityphon/PhoneSecurityApp.apk"),
+    ]
+    for p in possible_paths:
+        if p.exists():
+            return FileResponse(
+                path=str(p),
+                filename="PhoneSecurityApp.apk",
+                media_type="application/vnd.android.package-archive"
+            )
+    raise HTTPException(status_code=404, detail="APK file not found on server")
+
 
 @app.get("/", response_class=HTMLResponse)
 def root():
