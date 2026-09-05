@@ -154,6 +154,113 @@ def export_contacts_csv(session: Session = Depends(get_session)):
         headers={"Content-Disposition": "attachment; filename=Phone_Contacts_Backup.csv"}
     )
 
+# --- DIRECT RESTORE vCard (.VCF) EXPORT ---
+@app.get("/api/v1/export/contacts/vcf")
+def export_contacts_vcf(session: Session = Depends(get_session)):
+    contacts = session.exec(select(ContactBackup).order_by(ContactBackup.name.asc())).all()
+    vcf_lines = []
+    for c in contacts:
+        vcf_lines.append("BEGIN:VCARD")
+        vcf_lines.append("VERSION:3.0")
+        vcf_lines.append(f"FN:{c.name}")
+        vcf_lines.append(f"TEL;TYPE=CELL:{c.phone_number}")
+        if c.email:
+            vcf_lines.append(f"EMAIL:{c.email}")
+        vcf_lines.append("END:VCARD")
+    vcf_content = "\r\n".join(vcf_lines)
+    return Response(
+        content=vcf_content,
+        media_type="text/vcard",
+        headers={"Content-Disposition": "attachment; filename=Contacts_Restore.vcf"}
+    )
+
+# --- ACTIVITY LOGS CSV EXPORT ---
+@app.get("/api/v1/export/events/csv")
+def export_events_csv(session: Session = Depends(get_session)):
+    events = session.exec(select(ActivityEvent).order_by(ActivityEvent.timestamp.desc())).all()
+    output = io.StringIO()
+    writer = csv.writer(output)
+    writer.writerow(["Timestamp", "Device ID", "Event Type", "Battery %", "Latitude", "Longitude", "Details JSON"])
+    for e in events:
+        writer.writerow([
+            e.timestamp.strftime("%Y-%m-%d %H:%M:%S"),
+            e.device_id,
+            e.event_type,
+            e.battery_level if e.battery_level is not None else "",
+            e.latitude if e.latitude is not None else "",
+            e.longitude if e.longitude is not None else "",
+            e.details_json
+        ])
+    output.seek(0)
+    return Response(
+        content=output.getvalue(),
+        media_type="text/csv",
+        headers={"Content-Disposition": "attachment; filename=Activity_Logs_Export.csv"}
+    )
+
+# --- COMPLETE 1-CLICK DISASTER RECOVERY ZIP ARCHIVE ---
+import zipfile
+
+@app.get("/api/v1/export/full-backup.zip")
+def export_full_backup_zip(session: Session = Depends(get_session)):
+    contacts = session.exec(select(ContactBackup).order_by(ContactBackup.name.asc())).all()
+    events = session.exec(select(ActivityEvent).order_by(ActivityEvent.timestamp.desc())).all()
+    devices = session.exec(select(Device)).all()
+
+    zip_buffer = io.BytesIO()
+    with zipfile.ZipFile(zip_buffer, "w", zipfile.ZIP_DEFLATED) as zf:
+        # 1. Contacts CSV
+        c_csv = io.StringIO()
+        cw = csv.writer(c_csv)
+        cw.writerow(["Name", "Phone Number", "Email", "Device ID", "Backup Date"])
+        for c in contacts:
+            cw.writerow([c.name, c.phone_number, c.email or "", c.device_id, c.synced_at.strftime("%Y-%m-%d %H:%M:%S")])
+        zf.writestr("contacts_backup.csv", c_csv.getvalue())
+
+        # 2. Contacts VCF (vCard for 1-click restore on new phone)
+        vcf_lines = []
+        for c in contacts:
+            vcf_lines.append("BEGIN:VCARD")
+            vcf_lines.append("VERSION:3.0")
+            vcf_lines.append(f"FN:{c.name}")
+            vcf_lines.append(f"TEL;TYPE=CELL:{c.phone_number}")
+            if c.email:
+                vcf_lines.append(f"EMAIL:{c.email}")
+            vcf_lines.append("END:VCARD")
+        zf.writestr("contacts_restore.vcf", "\r\n".join(vcf_lines))
+
+        # 3. Activity Logs CSV
+        e_csv = io.StringIO()
+        ew = csv.writer(e_csv)
+        ew.writerow(["Timestamp", "Device ID", "Event Type", "Battery %", "Latitude", "Longitude", "Details JSON"])
+        for e in events:
+            ew.writerow([e.timestamp.strftime("%Y-%m-%d %H:%M:%S"), e.device_id, e.event_type, e.battery_level or "", e.latitude or "", e.longitude or "", e.details_json])
+        zf.writestr("activity_logs.csv", e_csv.getvalue())
+
+        # 4. Complete JSON snapshot
+        complete_json = {
+            "exported_at": datetime.utcnow().isoformat(),
+            "devices": [d.dict() for d in devices],
+            "contacts_count": len(contacts),
+            "contacts": [c.dict() for c in contacts],
+            "events_count": len(events),
+            "events": [e.dict() for e in events]
+        }
+        zf.writestr("complete_telemetry_and_contacts.json", json.dumps(complete_json, default=str, indent=2))
+
+        # 5. Raw SQLite database if present
+        db_path = Path(BASE_DIR.parent / "phone_security.db")
+        if db_path.exists():
+            zf.write(db_path, arcname="phone_security_raw_database.sqlite")
+
+    zip_buffer.seek(0)
+    return Response(
+        content=zip_buffer.getvalue(),
+        media_type="application/zip",
+        headers={"Content-Disposition": f"attachment; filename=Phone_Security_Complete_Backup_{datetime.utcnow().strftime('%Y%m%d_%H%M%S')}.zip"}
+    )
+
+
 # --- QUERY JSON API ---
 @app.get("/api/v1/events")
 def get_events(
