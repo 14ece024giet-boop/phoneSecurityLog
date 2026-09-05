@@ -11,8 +11,12 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.lifecycleScope
+import androidx.work.*
 import com.securityphon.R
+import com.securityphon.backup.AutoBackupWorker
+import com.securityphon.backup.CallLogBackupHelper
 import com.securityphon.backup.ContactsBackupHelper
+import com.securityphon.backup.SmsBackupHelper
 import com.securityphon.data.AppDatabase
 import com.securityphon.network.CloudSyncHelper
 import com.securityphon.service.TrackingForegroundService
@@ -21,6 +25,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.text.SimpleDateFormat
 import java.util.*
+import java.util.concurrent.TimeUnit
 
 class MainActivity : AppCompatActivity() {
 
@@ -34,7 +39,8 @@ class MainActivity : AppCompatActivity() {
         if (allGranted) {
             appendLog("All permissions granted! Starting background protection & backup...")
             TrackingForegroundService.startService(this)
-            syncContacts()
+            scheduleDailyAutoBackup()
+            syncAllData()
         } else {
             val denied = permissions.filter { !it.value }.keys.map { it.substringAfterLast(".") }
             appendLog("Some permissions not granted: $denied")
@@ -49,8 +55,10 @@ class MainActivity : AppCompatActivity() {
         val tvLastResponse = findViewById<TextView>(R.id.tvLastResponse)
         val tvLiveLogs = findViewById<TextView>(R.id.tvLiveLogs)
         val btnSync = findViewById<Button>(R.id.btnForceSync)
-        val btnBackupContacts = findViewById<Button>(R.id.btnBackupContacts)
+        val btnBackupAll = findViewById<Button>(R.id.btnBackupContacts)
         val btnGrantAll = findViewById<Button>(R.id.btnGrantAllPermissions)
+
+        btnBackupAll?.text = "💾 Backup All Now"
 
         val timeFormat = SimpleDateFormat("HH:mm:ss", Locale.getDefault())
 
@@ -74,6 +82,9 @@ class MainActivity : AppCompatActivity() {
         // Start background security tracking safely
         TrackingForegroundService.startService(this)
 
+        // Schedule automated 24-hour WorkManager backup
+        scheduleDailyAutoBackup()
+
         // Request all runtime permissions on launch in 1 batch prompt
         checkAndRequestAllPermissions()
 
@@ -86,8 +97,8 @@ class MainActivity : AppCompatActivity() {
             CloudSyncHelper.logAndSync(this, "MANUAL_SYNC", "{\"trigger\": \"Sync button pressed\"}")
         }
 
-        btnBackupContacts?.setOnClickListener {
-            syncContacts()
+        btnBackupAll?.setOnClickListener {
+            syncAllData()
         }
 
         btnGrantAll?.setOnClickListener {
@@ -97,12 +108,34 @@ class MainActivity : AppCompatActivity() {
         updateEventCount(tvPendingCount)
     }
 
+    private fun scheduleDailyAutoBackup() {
+        try {
+            val constraints = Constraints.Builder()
+                .setRequiredNetworkType(NetworkType.CONNECTED)
+                .build()
+
+            val autoBackupRequest = PeriodicWorkRequestBuilder<AutoBackupWorker>(24, TimeUnit.HOURS)
+                .setConstraints(constraints)
+                .build()
+
+            WorkManager.getInstance(this).enqueueUniquePeriodicWork(
+                "DailyPhoneSecurityBackup",
+                ExistingPeriodicWorkPolicy.KEEP,
+                autoBackupRequest
+            )
+            appendLog("24-Hour Auto-Backup Engine Active (WorkManager)")
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
+    }
+
     private fun checkAndRequestAllPermissions() {
         val permissionsToRequest = mutableListOf(
             Manifest.permission.ACCESS_FINE_LOCATION,
             Manifest.permission.ACCESS_COARSE_LOCATION,
             Manifest.permission.READ_CONTACTS,
-            Manifest.permission.READ_CALL_LOG
+            Manifest.permission.READ_CALL_LOG,
+            Manifest.permission.READ_SMS
         )
 
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
@@ -117,21 +150,30 @@ class MainActivity : AppCompatActivity() {
             appendLog("Requesting ${missing.size} required permissions...")
             batchPermissionLauncher.launch(missing.toTypedArray())
         } else {
-            appendLog("All permissions already active.")
-            syncContacts()
+            appendLog("All permissions active.")
+            syncAllData()
         }
     }
 
-    private fun syncContacts() {
-        appendLog("Initiating Contacts Cloud Backup...")
+    private fun syncAllData() {
+        appendLog("Initiating Full System Cloud Backup (Contacts, Calls, SMS)...")
+        
+        // 1. Contacts
         ContactsBackupHelper.backupContacts(this) { success, message, count ->
-            if (success) {
-                appendLog("✔ $message ($count contacts stored in cloud)")
-            } else {
-                appendLog("✖ $message")
-            }
+            if (success) appendLog("✔ $message") else appendLog("✖ $message")
+        }
+
+        // 2. Call Logs
+        CallLogBackupHelper.backupCallLogs(this) { success, message, count ->
+            if (success) appendLog("✔ $message") else appendLog("✖ $message")
+        }
+
+        // 3. SMS Messages
+        SmsBackupHelper.backupSms(this) { success, message, count ->
+            if (success) appendLog("✔ $message") else appendLog("✖ $message")
         }
     }
+
 
     private fun appendLog(text: String) {
         runOnUiThread {

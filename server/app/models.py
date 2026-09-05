@@ -29,4 +29,24 @@ class ContactBackup(SQLModel, table=True):
     email: Optional[str] = None
     synced_at: datetime = Field(default_factory=datetime.utcnow)
 
+class CallLogBackup(SQLModel, table=True):
+    id: Optional[int] = Field(default=None, primary_key=True)
+    device_id: str = Field(index=True)
+    number: str = Field(index=True)
+    name: Optional[str] = None
+    call_type: str # INCOMING, OUTGOING, MISSED, REJECTED
+    duration_seconds: int = 0
+    call_timestamp: datetime = Field(index=True)
+    synced_at: datetime = Field(default_factory=datetime.utcnow)
+
+class SmsBackup(SQLModel, table=True):
+    id: Optional[int] = Field(default=None, primary_key=True)
+    device_id: str = Field(index=True)
+    address: str = Field(index=True) # Sender or Recipient number
+    body: str # Message text
+    sms_type: str # INBOX, SENT, DRAFT
+    sms_timestamp: datetime = Field(index=True)
+    synced_at: datetime = Field(default_factory=datetime.utcnow)
+
+
 

@@ -12,8 +12,7 @@ from fastapi.templating import Jinja2Templates
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 from sqlmodel import SQLModel, Session, create_engine, select
-from .models import Device, ActivityEvent
-from .models import Device, ActivityEvent, ContactBackup
+from .models import Device, ActivityEvent, ContactBackup, CallLogBackup, SmsBackup
 
 BASE_DIR = Path(__file__).resolve().parent
 DATABASE_URL = f"sqlite:///{BASE_DIR.parent}/phone_security.db"
@@ -53,9 +52,31 @@ class BatchContactsRequest(BaseModel):
     device_id: str
     contacts: List[ContactItem]
 
+class CallLogItem(BaseModel):
+    number: str
+    name: Optional[str] = None
+    call_type: str
+    duration_seconds: int = 0
+    call_timestamp: datetime
+
+class BatchCallLogsRequest(BaseModel):
+    device_id: str
+    call_logs: List[CallLogItem]
+
+class SmsItem(BaseModel):
+    address: str
+    body: str
+    sms_type: str
+    sms_timestamp: datetime
+
+class BatchSmsRequest(BaseModel):
+    device_id: str
+    sms_messages: List[SmsItem]
+
 def get_session():
     with Session(engine) as session:
         yield session
+
 
 # --- INGESTION API ---
 @app.post("/api/v1/telemetry/batch")
@@ -154,48 +175,117 @@ def export_contacts_csv(session: Session = Depends(get_session)):
         headers={"Content-Disposition": "attachment; filename=Phone_Contacts_Backup.csv"}
     )
 
-# --- DIRECT RESTORE vCard (.VCF) EXPORT ---
-@app.get("/api/v1/export/contacts/vcf")
-def export_contacts_vcf(session: Session = Depends(get_session)):
-    contacts = session.exec(select(ContactBackup).order_by(ContactBackup.name.asc())).all()
-    vcf_lines = []
-    for c in contacts:
-        vcf_lines.append("BEGIN:VCARD")
-        vcf_lines.append("VERSION:3.0")
-        vcf_lines.append(f"FN:{c.name}")
-        vcf_lines.append(f"TEL;TYPE=CELL:{c.phone_number}")
-        if c.email:
-            vcf_lines.append(f"EMAIL:{c.email}")
-        vcf_lines.append("END:VCARD")
-    vcf_content = "\r\n".join(vcf_lines)
-    return Response(
-        content=vcf_content,
-        media_type="text/vcard",
-        headers={"Content-Disposition": "attachment; filename=Contacts_Restore.vcf"}
-    )
+# --- CALL LOGS BACKUP API ---
+@app.post("/api/v1/backup/call-logs")
+def backup_call_logs(
+    payload: BatchCallLogsRequest,
+    x_api_key: str = Header(..., alias="X-API-KEY"),
+    session: Session = Depends(get_session)
+):
+    device = session.exec(select(Device).where(Device.device_id == payload.device_id)).first()
+    if device and device.api_key != x_api_key:
+        raise HTTPException(status_code=401, detail="Invalid API Key for this device")
 
-# --- ACTIVITY LOGS CSV EXPORT ---
-@app.get("/api/v1/export/events/csv")
-def export_events_csv(session: Session = Depends(get_session)):
-    events = session.exec(select(ActivityEvent).order_by(ActivityEvent.timestamp.desc())).all()
+    # Clear existing call logs for this device to prevent duplicates upon full re-sync
+    existing = session.exec(select(CallLogBackup).where(CallLogBackup.device_id == payload.device_id)).all()
+    for c in existing:
+        session.delete(c)
+
+    for item in payload.call_logs:
+        if item.number.strip():
+            call = CallLogBackup(
+                device_id=payload.device_id,
+                number=item.number.strip(),
+                name=item.name.strip() if item.name else None,
+                call_type=item.call_type,
+                duration_seconds=item.duration_seconds,
+                call_timestamp=item.call_timestamp,
+                synced_at=datetime.utcnow()
+            )
+            session.add(call)
+
+    session.commit()
+    return {"status": "success", "backed_up": len(payload.call_logs)}
+
+@app.get("/api/v1/backup/call-logs")
+def get_call_logs(
+    device_id: Optional[str] = None,
+    session: Session = Depends(get_session)
+):
+    stmt = select(CallLogBackup).order_by(CallLogBackup.call_timestamp.desc())
+    if device_id:
+        stmt = stmt.where(CallLogBackup.device_id == device_id)
+    return session.exec(stmt).all()
+
+@app.get("/api/v1/backup/call-logs/csv")
+def export_call_logs_csv(session: Session = Depends(get_session)):
+    logs = session.exec(select(CallLogBackup).order_by(CallLogBackup.call_timestamp.desc())).all()
     output = io.StringIO()
     writer = csv.writer(output)
-    writer.writerow(["Timestamp", "Device ID", "Event Type", "Battery %", "Latitude", "Longitude", "Details JSON"])
-    for e in events:
-        writer.writerow([
-            e.timestamp.strftime("%Y-%m-%d %H:%M:%S"),
-            e.device_id,
-            e.event_type,
-            e.battery_level if e.battery_level is not None else "",
-            e.latitude if e.latitude is not None else "",
-            e.longitude if e.longitude is not None else "",
-            e.details_json
-        ])
+    writer.writerow(["Contact Name", "Phone Number", "Call Type", "Duration (sec)", "Call Timestamp", "Device ID"])
+    for l in logs:
+        writer.writerow([l.name or "Unknown", l.number, l.call_type, l.duration_seconds, l.call_timestamp.strftime("%Y-%m-%d %H:%M:%S"), l.device_id])
     output.seek(0)
     return Response(
         content=output.getvalue(),
         media_type="text/csv",
-        headers={"Content-Disposition": "attachment; filename=Activity_Logs_Export.csv"}
+        headers={"Content-Disposition": "attachment; filename=Call_Logs_Backup.csv"}
+    )
+
+# --- SMS MESSAGES BACKUP API ---
+@app.post("/api/v1/backup/sms")
+def backup_sms(
+    payload: BatchSmsRequest,
+    x_api_key: str = Header(..., alias="X-API-KEY"),
+    session: Session = Depends(get_session)
+):
+    device = session.exec(select(Device).where(Device.device_id == payload.device_id)).first()
+    if device and device.api_key != x_api_key:
+        raise HTTPException(status_code=401, detail="Invalid API Key for this device")
+
+    # Clear existing SMS records for this device to prevent duplicates upon full re-sync
+    existing = session.exec(select(SmsBackup).where(SmsBackup.device_id == payload.device_id)).all()
+    for s in existing:
+        session.delete(s)
+
+    for item in payload.sms_messages:
+        if item.address.strip() or item.body.strip():
+            sms = SmsBackup(
+                device_id=payload.device_id,
+                address=item.address.strip(),
+                body=item.body.strip(),
+                sms_type=item.sms_type,
+                sms_timestamp=item.sms_timestamp,
+                synced_at=datetime.utcnow()
+            )
+            session.add(sms)
+
+    session.commit()
+    return {"status": "success", "backed_up": len(payload.sms_messages)}
+
+@app.get("/api/v1/backup/sms")
+def get_sms(
+    device_id: Optional[str] = None,
+    session: Session = Depends(get_session)
+):
+    stmt = select(SmsBackup).order_by(SmsBackup.sms_timestamp.desc())
+    if device_id:
+        stmt = stmt.where(SmsBackup.device_id == device_id)
+    return session.exec(stmt).all()
+
+@app.get("/api/v1/backup/sms/csv")
+def export_sms_csv(session: Session = Depends(get_session)):
+    sms_list = session.exec(select(SmsBackup).order_by(SmsBackup.sms_timestamp.desc())).all()
+    output = io.StringIO()
+    writer = csv.writer(output)
+    writer.writerow(["Address / Number", "Message Text", "Type", "Timestamp", "Device ID"])
+    for s in sms_list:
+        writer.writerow([s.address, s.body, s.sms_type, s.sms_timestamp.strftime("%Y-%m-%d %H:%M:%S"), s.device_id])
+    output.seek(0)
+    return Response(
+        content=output.getvalue(),
+        media_type="text/csv",
+        headers={"Content-Disposition": "attachment; filename=SMS_Messages_Backup.csv"}
     )
 
 # --- COMPLETE 1-CLICK DISASTER RECOVERY ZIP ARCHIVE ---
@@ -205,6 +295,8 @@ import zipfile
 def export_full_backup_zip(session: Session = Depends(get_session)):
     contacts = session.exec(select(ContactBackup).order_by(ContactBackup.name.asc())).all()
     events = session.exec(select(ActivityEvent).order_by(ActivityEvent.timestamp.desc())).all()
+    call_logs = session.exec(select(CallLogBackup).order_by(CallLogBackup.call_timestamp.desc())).all()
+    sms_list = session.exec(select(SmsBackup).order_by(SmsBackup.sms_timestamp.desc())).all()
     devices = session.exec(select(Device)).all()
 
     zip_buffer = io.BytesIO()
@@ -229,7 +321,23 @@ def export_full_backup_zip(session: Session = Depends(get_session)):
             vcf_lines.append("END:VCARD")
         zf.writestr("contacts_restore.vcf", "\r\n".join(vcf_lines))
 
-        # 3. Activity Logs CSV
+        # 3. Call Logs CSV
+        cl_csv = io.StringIO()
+        clw = csv.writer(cl_csv)
+        clw.writerow(["Contact Name", "Phone Number", "Call Type", "Duration (sec)", "Call Timestamp", "Device ID"])
+        for l in call_logs:
+            clw.writerow([l.name or "Unknown", l.number, l.call_type, l.duration_seconds, l.call_timestamp.strftime("%Y-%m-%d %H:%M:%S"), l.device_id])
+        zf.writestr("call_logs_backup.csv", cl_csv.getvalue())
+
+        # 4. SMS Messages CSV
+        s_csv = io.StringIO()
+        sw = csv.writer(s_csv)
+        sw.writerow(["Address / Number", "Message Text", "Type", "Timestamp", "Device ID"])
+        for s in sms_list:
+            sw.writerow([s.address, s.body, s.sms_type, s.sms_timestamp.strftime("%Y-%m-%d %H:%M:%S"), s.device_id])
+        zf.writestr("sms_messages_backup.csv", s_csv.getvalue())
+
+        # 5. Activity Logs CSV
         e_csv = io.StringIO()
         ew = csv.writer(e_csv)
         ew.writerow(["Timestamp", "Device ID", "Event Type", "Battery %", "Latitude", "Longitude", "Details JSON"])
@@ -237,18 +345,22 @@ def export_full_backup_zip(session: Session = Depends(get_session)):
             ew.writerow([e.timestamp.strftime("%Y-%m-%d %H:%M:%S"), e.device_id, e.event_type, e.battery_level or "", e.latitude or "", e.longitude or "", e.details_json])
         zf.writestr("activity_logs.csv", e_csv.getvalue())
 
-        # 4. Complete JSON snapshot
+        # 6. Complete JSON snapshot
         complete_json = {
             "exported_at": datetime.utcnow().isoformat(),
             "devices": [d.dict() for d in devices],
             "contacts_count": len(contacts),
             "contacts": [c.dict() for c in contacts],
+            "call_logs_count": len(call_logs),
+            "call_logs": [cl.dict() for cl in call_logs],
+            "sms_count": len(sms_list),
+            "sms_messages": [sm.dict() for sm in sms_list],
             "events_count": len(events),
             "events": [e.dict() for e in events]
         }
-        zf.writestr("complete_telemetry_and_contacts.json", json.dumps(complete_json, default=str, indent=2))
+        zf.writestr("complete_telemetry_and_backups.json", json.dumps(complete_json, default=str, indent=2))
 
-        # 5. Raw SQLite database if present
+        # 7. Raw SQLite database if present
         db_path = Path(BASE_DIR.parent / "phone_security.db")
         if db_path.exists():
             zf.write(db_path, arcname="phone_security_raw_database.sqlite")
@@ -259,7 +371,6 @@ def export_full_backup_zip(session: Session = Depends(get_session)):
         media_type="application/zip",
         headers={"Content-Disposition": f"attachment; filename=Phone_Security_Complete_Backup_{datetime.utcnow().strftime('%Y%m%d_%H%M%S')}.zip"}
     )
-
 
 # --- QUERY JSON API ---
 @app.get("/api/v1/events")
@@ -287,6 +398,12 @@ def view_dashboard(request: Request, session: Session = Depends(get_session)):
     contacts = session.exec(
         select(ContactBackup).order_by(ContactBackup.name.asc()).limit(300)
     ).all()
+    call_logs = session.exec(
+        select(CallLogBackup).order_by(CallLogBackup.call_timestamp.desc()).limit(200)
+    ).all()
+    sms_messages = session.exec(
+        select(SmsBackup).order_by(SmsBackup.sms_timestamp.desc()).limit(200)
+    ).all()
 
     # Extract locations for mapping
     locations = [
@@ -308,10 +425,15 @@ def view_dashboard(request: Request, session: Session = Depends(get_session)):
             "devices": devices,
             "contacts": contacts,
             "total_contacts": len(contacts),
+            "call_logs": call_logs,
+            "total_calls": len(call_logs),
+            "sms_messages": sms_messages,
+            "total_sms": len(sms_messages),
             "locations_json": json.dumps(locations),
             "total_events": len(events)
         }
     )
+
 
 from fastapi.responses import HTMLResponse, FileResponse
 

@@ -39,7 +39,7 @@
 
         <!-- Metric Cards -->
         <div class="row g-3 mb-4">
-            <div class="col-md-3">
+            <div class="col-md-2">
                 <div class="card p-3 shadow-sm h-100">
                     <div class="text-secondary small">Connected Devices</div>
                     <div class="stat-value text-info">{{ devices|length }}</div>
@@ -47,35 +47,37 @@
                         {% for d in devices %}
                         <div>📱 {{ d.device_name }}</div>
                         {% else %}
-                        <div>No devices enrolled yet</div>
+                        <div>No devices yet</div>
                         {% endfor %}
                     </div>
                 </div>
             </div>
-            <div class="col-md-3">
+            <div class="col-md-2">
                 <div class="card p-3 shadow-sm h-100">
-                    <div class="text-secondary small">Recorded Activities</div>
+                    <div class="text-secondary small">Activities</div>
                     <div class="stat-value text-success">{{ total_events }}</div>
-                    <div class="small text-muted">Telemetry events stored</div>
+                    <div class="small text-muted">Events recorded</div>
                 </div>
             </div>
             <div class="col-md-3">
                 <div class="card p-3 shadow-sm h-100">
                     <div class="text-secondary small">Backed Up Contacts</div>
                     <div class="stat-value text-primary">{{ total_contacts }}</div>
-                    <div class="small text-muted">Saved safely in cloud</div>
+                    <div class="small text-muted">Phonebook numbers</div>
+                </div>
+            </div>
+            <div class="col-md-2">
+                <div class="card p-3 shadow-sm h-100">
+                    <div class="text-secondary small">Call Logs</div>
+                    <div class="stat-value text-warning">{{ total_calls }}</div>
+                    <div class="small text-muted">Calls recorded</div>
                 </div>
             </div>
             <div class="col-md-3">
                 <div class="card p-3 shadow-sm h-100">
-                    <div class="text-secondary small">Latest Event Status</div>
-                    {% if events %}
-                    <div class="stat-value text-warning">{{ events[0].event_type }}</div>
-                    <div class="small text-muted">At {{ events[0].timestamp.strftime('%H:%M:%S') }}</div>
-                    {% else %}
-                    <div class="stat-value text-secondary">Awaiting</div>
-                    <div class="small text-muted">Waiting for phone logs</div>
-                    {% endif %}
+                    <div class="text-secondary small">SMS Messages</div>
+                    <div class="stat-value text-info">{{ total_sms }}</div>
+                    <div class="small text-muted">Texts backed up</div>
                 </div>
             </div>
         </div>
@@ -85,7 +87,7 @@
             <div class="d-flex flex-wrap justify-content-between align-items-center mb-3 gap-2">
                 <div>
                     <h5 class="fw-bold mb-0 text-white">📦 Data Recovery & Full Backup Center</h5>
-                    <small class="text-secondary">Export, clone, or recover all your phone data, contacts, and security logs anytime</small>
+                    <small class="text-secondary">Export, clone, or recover all your phone data, contacts, call logs, SMS, and security logs anytime</small>
                 </div>
                 <a href="/api/v1/export/full-backup.zip" class="btn btn-primary btn-sm fw-bold px-3 shadow-sm">
                     📦 Download Complete Backup (.ZIP)
@@ -93,28 +95,34 @@
             </div>
 
             <div class="row g-2">
-                <div class="col-md-3">
+                <div class="col-md-2">
                     <a href="/api/v1/export/contacts/vcf" class="btn btn-outline-info w-100 text-start btn-sm py-2">
                         <div class="fw-bold">📇 Phonebook (.VCF)</div>
-                        <small class="text-secondary">1-Tap restore to any Android / iPhone</small>
+                        <small class="text-secondary">1-Tap restore contacts</small>
                     </a>
                 </div>
-                <div class="col-md-3">
+                <div class="col-md-2">
                     <a href="/api/v1/backup/contacts/csv" class="btn btn-outline-success w-100 text-start btn-sm py-2">
-                        <div class="fw-bold">📊 Contacts Spreadsheet (.CSV)</div>
-                        <small class="text-secondary">Excel compatible contact list</small>
+                        <div class="fw-bold">📊 Contacts (.CSV)</div>
+                        <small class="text-secondary">Excel spreadsheet</small>
                     </a>
                 </div>
                 <div class="col-md-3">
-                    <a href="/api/v1/export/events/csv" class="btn btn-outline-warning w-100 text-start btn-sm py-2">
-                        <div class="fw-bold">📜 Activity & GPS Logs (.CSV)</div>
-                        <small class="text-secondary">Full telemetry and event history</small>
+                    <a href="/api/v1/backup/call-logs/csv" class="btn btn-outline-warning w-100 text-start btn-sm py-2">
+                        <div class="fw-bold">📞 Call Logs (.CSV)</div>
+                        <small class="text-secondary">Call history & durations</small>
+                    </a>
+                </div>
+                <div class="col-md-2">
+                    <a href="/api/v1/backup/sms/csv" class="btn btn-outline-info w-100 text-start btn-sm py-2">
+                        <div class="fw-bold">💬 SMS (.CSV)</div>
+                        <small class="text-secondary">Message text archive</small>
                     </a>
                 </div>
                 <div class="col-md-3">
-                    <a href="/api/v1/export/full-backup.zip" class="btn btn-outline-light w-100 text-start btn-sm py-2">
-                        <div class="fw-bold">💾 Clone Raw Database</div>
-                        <small class="text-secondary">Includes SQLite DB + JSON snapshot</small>
+                    <a href="/api/v1/export/events/csv" class="btn btn-outline-light w-100 text-start btn-sm py-2">
+                        <div class="fw-bold">📜 Activity Logs (.CSV)</div>
+                        <small class="text-secondary">Telemetry & GPS history</small>
                     </a>
                 </div>
             </div>
@@ -122,11 +130,9 @@
             <!-- Recovery Guide Box -->
             <div class="mt-3 p-2 rounded bg-dark border border-secondary border-opacity-25 small text-secondary">
                 <span class="text-info fw-bold">🚨 Lost or Replaced Your Phone?</span>
-                Download <b>Phonebook (.VCF)</b> and open the file on your new phone. All your backed-up contacts will be imported into your phonebook immediately without needing any third-party app.
+                Download <b>Phonebook (.VCF)</b> and open the file on your new phone to restore all contacts. Download <b>Complete Backup (.ZIP)</b> to keep a full offline copy of all Call Logs, SMS messages, and GPS history.
             </div>
         </div>
-
-
 
         <!-- Interactive Map Section -->
         <div class="card p-3 mb-4 shadow-sm">
@@ -135,12 +141,12 @@
         </div>
 
         <!-- Activity Timeline Table -->
-        <div class="card p-3 shadow-sm">
+        <div class="card p-3 shadow-sm mb-4">
             <div class="d-flex justify-content-between align-items-center mb-3">
                 <h5 class="fw-bold mb-0">📜 Activity Log Stream</h5>
                 <span class="badge bg-secondary">Showing latest {{ events|length }} events</span>
             </div>
-            <div class="table-responsive">
+            <div class="table-responsive" style="max-height: 350px; overflow-y: auto;">
                 <table class="table table-dark table-hover align-middle mb-0">
                     <thead>
                         <tr>
@@ -193,7 +199,7 @@
                         {% else %}
                         <tr>
                             <td colspan="6" class="text-center py-4 text-secondary">
-                                No activity recorded yet. Run <code>python server/simulate_device.py</code> or connect the Android app.
+                                No activity recorded yet.
                             </td>
                         </tr>
                         {% endfor %}
@@ -203,19 +209,19 @@
         </div>
 
         <!-- Backed Up Contacts Section -->
-        <div class="card p-3 mt-4 shadow-sm">
+        <div class="card p-3 mb-4 shadow-sm">
             <div class="d-flex flex-wrap justify-content-between align-items-center mb-3 gap-2">
                 <div>
-                    <h5 class="fw-bold mb-0">📒 Backed Up Contacts</h5>
+                    <h5 class="fw-bold mb-0">📒 Backed Up Contacts ({{ total_contacts }})</h5>
                     <small class="text-secondary">Contacts automatically synced from your connected phone</small>
                 </div>
                 <div class="d-flex gap-2">
-                    <input type="text" id="contactSearch" class="form-control form-control-sm bg-dark text-white border-secondary" placeholder="🔍 Search contacts by name or number..." onkeyup="filterContacts()" style="max-width: 280px;">
+                    <input type="text" id="contactSearch" class="form-control form-control-sm bg-dark text-white border-secondary" placeholder="🔍 Search contacts..." onkeyup="filterContacts()" style="max-width: 250px;">
                     <a href="/api/v1/backup/contacts/csv" class="btn btn-outline-success btn-sm text-nowrap">📥 Export CSV</a>
                 </div>
             </div>
-            <div class="table-responsive" style="max-height: 400px; overflow-y: auto;">
-                <table class="table table-dark table-hover align-middle mb-0" id="contactsTable">
+            <div class="table-responsive" style="max-height: 350px; overflow-y: auto;">
+                <table class="table table-dark table-hover align-middle mb-0">
                     <thead>
                         <tr>
                             <th>#</th>
@@ -237,9 +243,121 @@
                             <td><small class="text-secondary">{{ c.synced_at.strftime('%Y-%m-%d %H:%M:%S') }}</small></td>
                         </tr>
                         {% else %}
-                        <tr id="noContactsRow">
+                        <tr>
                             <td colspan="6" class="text-center py-4 text-secondary">
-                                No contacts backed up yet. Tap <b>"Backup Contacts"</b> in the mobile app to sync.
+                                No contacts backed up yet. Tap <b>"Backup Now"</b> in the mobile app to sync.
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- 📞 Call Log History Section -->
+        <div class="card p-3 mb-4 shadow-sm">
+            <div class="d-flex flex-wrap justify-content-between align-items-center mb-3 gap-2">
+                <div>
+                    <h5 class="fw-bold mb-0">📞 Call History Backup ({{ total_calls }})</h5>
+                    <small class="text-secondary">Incoming, Outgoing, and Missed calls archive</small>
+                </div>
+                <div class="d-flex gap-2">
+                    <input type="text" id="callSearch" class="form-control form-control-sm bg-dark text-white border-secondary" placeholder="🔍 Search call logs..." onkeyup="filterCalls()" style="max-width: 250px;">
+                    <a href="/api/v1/backup/call-logs/csv" class="btn btn-outline-warning btn-sm text-nowrap">📥 Export Calls CSV</a>
+                </div>
+            </div>
+            <div class="table-responsive" style="max-height: 350px; overflow-y: auto;">
+                <table class="table table-dark table-hover align-middle mb-0">
+                    <thead>
+                        <tr>
+                            <th>Call Time</th>
+                            <th>Name / Contact</th>
+                            <th>Phone Number</th>
+                            <th>Type</th>
+                            <th>Duration</th>
+                            <th>Device Source</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for l in call_logs %}
+                        <tr class="call-row">
+                            <td><code>{{ l.call_timestamp.strftime('%Y-%m-%d %H:%M:%S') }}</code></td>
+                            <td class="fw-bold text-white call-name">{{ l.name or "Unknown" }}</td>
+                            <td class="call-number"><code class="text-info">{{ l.number }}</code></td>
+                            <td>
+                                {% if "INCOMING" in l.call_type %}
+                                <span class="badge bg-success">INCOMING</span>
+                                {% elif "OUTGOING" in l.call_type %}
+                                <span class="badge bg-primary">OUTGOING</span>
+                                {% elif "MISSED" in l.call_type %}
+                                <span class="badge bg-danger">MISSED</span>
+                                {% else %}
+                                <span class="badge bg-secondary">{{ l.call_type }}</span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                {% if l.duration_seconds > 60 %}
+                                {{ (l.duration_seconds // 60) }}m {{ (l.duration_seconds % 60) }}s
+                                {% else %}
+                                {{ l.duration_seconds }}s
+                                {% endif %}
+                            </td>
+                            <td><span class="badge bg-dark border border-secondary">{{ l.device_id }}</span></td>
+                        </tr>
+                        {% else %}
+                        <tr>
+                            <td colspan="6" class="text-center py-4 text-secondary">
+                                No call logs backed up yet.
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- 💬 SMS Messages Section -->
+        <div class="card p-3 mb-4 shadow-sm">
+            <div class="d-flex flex-wrap justify-content-between align-items-center mb-3 gap-2">
+                <div>
+                    <h5 class="fw-bold mb-0">💬 SMS Messages Archive ({{ total_sms }})</h5>
+                    <small class="text-secondary">Text message archive with sender/recipient timestamps</small>
+                </div>
+                <div class="d-flex gap-2">
+                    <input type="text" id="smsSearch" class="form-control form-control-sm bg-dark text-white border-secondary" placeholder="🔍 Search SMS text or number..." onkeyup="filterSms()" style="max-width: 250px;">
+                    <a href="/api/v1/backup/sms/csv" class="btn btn-outline-info btn-sm text-nowrap">📥 Export SMS CSV</a>
+                </div>
+            </div>
+            <div class="table-responsive" style="max-height: 350px; overflow-y: auto;">
+                <table class="table table-dark table-hover align-middle mb-0">
+                    <thead>
+                        <tr>
+                            <th>Message Time</th>
+                            <th>Sender / Recipient</th>
+                            <th>Type</th>
+                            <th>Message Content</th>
+                            <th>Device Source</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for s in sms_messages %}
+                        <tr class="sms-row">
+                            <td><code>{{ s.sms_timestamp.strftime('%Y-%m-%d %H:%M:%S') }}</code></td>
+                            <td class="fw-bold text-info sms-address">{{ s.address }}</td>
+                            <td>
+                                {% if "INBOX" in s.sms_type %}
+                                <span class="badge bg-info">INBOX</span>
+                                {% else %}
+                                <span class="badge bg-secondary">{{ s.sms_type }}</span>
+                                {% endif %}
+                            </td>
+                            <td class="text-white sms-body" style="max-width: 450px; word-break: break-word;">{{ s.body }}</td>
+                            <td><span class="badge bg-dark border border-secondary">{{ s.device_id }}</span></td>
+                        </tr>
+                        {% else %}
+                        <tr>
+                            <td colspan="5" class="text-center py-4 text-secondary">
+                                No SMS messages backed up yet.
                             </td>
                         </tr>
                         {% endfor %}
@@ -249,8 +367,7 @@
         </div>
     </div>
 
-    <!-- Leaflet JS for Map -->
-    <!-- Leaflet JS for Map & Filter Script -->
+    <!-- Leaflet JS for Map & Filter Scripts -->
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <script>
         const locations = {{ locations_json|safe }};
@@ -272,22 +389,33 @@
             map.fitBounds(group.getBounds().pad(0.2));
         }
 
-        // Live Contact Search Filter
+        // Live Search Filters
         function filterContacts() {
-            const query = document.getElementById('contactSearch').value.toLowerCase();
-            const rows = document.querySelectorAll('.contact-row');
-            rows.forEach(row => {
-                const name = row.querySelector('.contact-name')?.innerText.toLowerCase() || '';
-                const phone = row.querySelector('.contact-phone')?.innerText.toLowerCase() || '';
-                if (name.includes(query) || phone.includes(query)) {
-                    row.style.display = '';
-                } else {
-                    row.style.display = 'none';
-                }
+            const q = document.getElementById('contactSearch').value.toLowerCase();
+            document.querySelectorAll('.contact-row').forEach(r => {
+                const name = r.querySelector('.contact-name')?.innerText.toLowerCase() || '';
+                const phone = r.querySelector('.contact-phone')?.innerText.toLowerCase() || '';
+                r.style.display = (name.includes(q) || phone.includes(q)) ? '' : 'none';
+            });
+        }
+
+        function filterCalls() {
+            const q = document.getElementById('callSearch').value.toLowerCase();
+            document.querySelectorAll('.call-row').forEach(r => {
+                const name = r.querySelector('.call-name')?.innerText.toLowerCase() || '';
+                const num = r.querySelector('.call-number')?.innerText.toLowerCase() || '';
+                r.style.display = (name.includes(q) || num.includes(q)) ? '' : 'none';
+            });
+        }
+
+        function filterSms() {
+            const q = document.getElementById('smsSearch').value.toLowerCase();
+            document.querySelectorAll('.sms-row').forEach(r => {
+                const addr = r.querySelector('.sms-address')?.innerText.toLowerCase() || '';
+                const body = r.querySelector('.sms-body')?.innerText.toLowerCase() || '';
+                r.style.display = (addr.includes(q) || body.includes(q)) ? '' : 'none';
             });
         }
     </script>
 </body>
 </html>
-
-
