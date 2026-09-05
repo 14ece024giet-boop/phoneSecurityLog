@@ -1,0 +1,133 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="#0f172a"
+    android:orientation="vertical"
+    android:padding="20dp">
+
+    <TextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="Phone Security Guard"
+        android:textColor="#ffffff"
+        android:textSize="22sp"
+        android:textStyle="bold"
+        android:layout_marginBottom="4dp" />
+
+    <TextView
+        android:id="@+id/tvCloudUrl"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="Target: https://phone-security-cloud.onrender.com"
+        android:textColor="#38bdf8"
+        android:textSize="12sp"
+        android:layout_marginBottom="16dp" />
+
+    <!-- Status Card -->
+    <com.google.android.material.card.MaterialCardView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:backgroundTint="#1e293b"
+        android:layout_marginBottom="16dp">
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:padding="16dp">
+
+            <TextView
+                android:id="@+id/tvStatus"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Status: Active &amp; Protecting"
+                android:textColor="#10b981"
+                android:textSize="16sp"
+                android:textStyle="bold" />
+
+            <TextView
+                android:id="@+id/tvPendingCount"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Queued Local Events: 0"
+                android:textColor="#cbd5e1"
+                android:layout_marginTop="4dp" />
+
+            <TextView
+                android:id="@+id/tvLastResponse"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Last Server Response: None yet"
+                android:textColor="#fbbf24"
+                android:textSize="12sp"
+                android:layout_marginTop="6dp" />
+        </LinearLayout>
+    </com.google.android.material.card.MaterialCardView>
+
+    <!-- Action Buttons Row -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:layout_marginBottom="10dp">
+
+        <Button
+            android:id="@+id/btnForceSync"
+            android:layout_width="0dp"
+            android:layout_height="52dp"
+            android:layout_weight="1"
+            android:text="⚡ Sync Logs"
+            android:backgroundTint="#0284c7"
+            android:textSize="13sp"
+            android:textStyle="bold"
+            android:layout_marginEnd="5dp" />
+
+        <Button
+            android:id="@+id/btnBackupContacts"
+            android:layout_width="0dp"
+            android:layout_height="52dp"
+            android:layout_weight="1"
+            android:text="📒 Backup Contacts"
+            android:backgroundTint="#059669"
+            android:textSize="13sp"
+            android:textStyle="bold"
+            android:layout_marginStart="5dp" />
+    </LinearLayout>
+
+    <Button
+        android:id="@+id/btnGrantAllPermissions"
+        android:layout_width="match_parent"
+        android:layout_height="48dp"
+        android:text="🛡️ Grant All Permissions (1-Tap)"
+        android:backgroundTint="#7c3aed"
+        android:textSize="13sp"
+        android:textStyle="bold"
+        android:layout_marginBottom="14dp" />
+
+    <TextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="Live Connection Logs:"
+        android:textColor="#94a3b8"
+        android:textSize="12sp"
+        android:layout_marginBottom="4dp" />
+
+    <ScrollView
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1"
+        android:background="#1e293b"
+        android:padding="10dp">
+
+        <TextView
+            android:id="@+id/tvLiveLogs"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:fontFamily="monospace"
+            android:text="Waiting for sync..."
+            android:textColor="#a7f3d0"
+            android:textSize="12sp" />
+    </ScrollView>
+
+</LinearLayout>

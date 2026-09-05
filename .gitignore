@@ -1,0 +1,24 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.sqlite3
+*.db
+.env
+venv/
+.venv/
+
+# Android build outputs & local config
+.gradle/
+build/
+android-client/.gradle/
+android-client/build/
+android-client/app/build/
+android-client/local.properties
+android-client/.idea/
+*.apk
+PhoneSecurityApp.apk
+
+# VS Code
+.vscode/
+
